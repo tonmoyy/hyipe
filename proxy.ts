@@ -88,6 +88,6 @@ export async function proxy(request: NextRequest) {
 
 // ✅ Use the new config export for proxy
 export const config = {
-    runtime: 'nodejs',                                   // required
+                              // required
     matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
 }
