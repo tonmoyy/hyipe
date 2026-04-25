@@ -1,3 +1,4 @@
+// app/dashboard/layout.tsx
 'use client'
 
 import { useEffect } from 'react'
@@ -14,10 +15,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     useEffect(() => {
         if (!loading && !profile) {
-            router.push('/auth')
+            router.replace('/auth')   // use replace to avoid back‑button issues
         }
     }, [loading, profile, router])
 
+    // ⏳ Initial auth check – show a spinner
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen">
@@ -26,7 +28,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )
     }
 
-    if (!profile) return null
+    // 🔄 After loading, if no profile → show redirecting message (no blank screen)
+    if (!profile) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <p className="text-gray-500">Signing out…</p>
+            </div>
+        )
+    }
 
     const Sidebar =
         profile.role === 'brand' ? BrandSidebar :
