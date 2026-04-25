@@ -1,125 +1,103 @@
-// middleware.ts
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+// app/dashboard/brand/profile/page.tsx
+'use client'
 
-export async function middleware(request: NextRequest) {
-    // ✅ Single response – all cookies are added to this
-    const response = NextResponse.next({ request })
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/providers/AuthProvider'
+import toast from 'react-hot-toast'
 
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name) {
-                    return request.cookies.get(name)?.value
-                },
-                set(name, value, options) {
-                    // Update the request so later reads in the same request see it
-                    request.cookies.set({ name, value, ...options })
-                    // Add to the response WITHOUT creating a new one
-                    response.cookies.set({ name, value, ...options })
-                },
-                remove(name, options) {
-                    request.cookies.set({ name, value: '', ...options })
-                    response.cookies.set({ name, value: '', ...options })
-                },
-            },
-        }
-    )
+export default function BrandProfile() {
+    const { user } = useAuth()
+    const [fullName, setFullName] = useState('')
+    const [bio, setBio] = useState('')
+    const [whatsapp, setWhatsapp] = useState('')
+    const [loading, setLoading] = useState(true)
 
-    const { data: { session } } = await supabase.auth.getSession()
+    // Fetch existing profile data
+    useEffect(() => {
+        if (!user) return
 
-    const path = request.nextUrl.pathname
-    const isPublicPath =
-        path === '/' ||
-        path.startsWith('/auth') ||
-        path.startsWith('/marketplace')
-
-    // 1. No session – only public paths
-    if (!session) {
-        if (!isPublicPath) {
-            const url = new URL('/auth', request.url)
-            url.searchParams.set('redirect', path)
-            return NextResponse.redirect(url)
-        }
-        return response
-    }
-
-    const user = session.user
-
-    // 2. Already logged in – push away from /auth (except /auth/verified)
-    if (path.startsWith('/auth') && !path.startsWith('/auth/verified')) {
-        if (!user.email_confirmed_at) {
-            return NextResponse.redirect(new URL('/', request.url))
-        }
-        const { data: profile } = await supabase
+        supabase
             .from('profiles')
-            .select('role')
+            .select('full_name, bio, whatsapp_number')
             .eq('id', user.id)
             .maybeSingle()
+            .then(({ data, error }) => {
+                if (error) {
+                    toast.error('Could not load profile')
+                } else if (data) {
+                    setFullName(data.full_name || '')
+                    setBio(data.bio || '')
+                    setWhatsapp(data.whatsapp_number || '')
+                }
+                setLoading(false)
+            })
+    }, [user])
 
-        const role = profile?.role
-        switch (role) {
-            case 'influencer':
-                return NextResponse.redirect(new URL('/dashboard/influencer/profile', request.url))
-            case 'brand':
-                return NextResponse.redirect(new URL('/dashboard/brand/campaigns', request.url))
-            case 'admin':
-                return NextResponse.redirect(new URL('/admin', request.url))
-            default:
-                await supabase.auth.signOut()
-                return NextResponse.redirect(new URL('/auth', request.url))
+    // Save changes
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault()
+
+        const { error } = await supabase
+            .from('profiles')
+            .update({
+                full_name: fullName,
+                bio,
+                whatsapp_number: whatsapp,
+            })
+            .eq('id', user!.id)
+
+        if (error) {
+            toast.error(error.message)
+        } else {
+            toast.success('Profile updated successfully')
         }
     }
 
-    // 3. Email not confirmed – stay in public area
-    if (!user.email_confirmed_at) {
-        if (!isPublicPath) {
-            return NextResponse.redirect(new URL('/', request.url))
-        }
-        return response
-    }
+    if (loading) return <div className="p-6">Loading your profile…</div>
 
-    // 4. Verified user – enforce role routing
-    const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle()
+    return (
+        <div className="max-w-lg">
+            <h1 className="text-2xl font-bold mb-6">Brand Profile</h1>
+            <form onSubmit={handleSave} className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium mb-1">Full name</label>
+                    <input
+                        placeholder="Your name or company representative"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className="w-full border p-2 rounded"
+                    />
+                </div>
 
-    if (error || !profile) {
-        await supabase.auth.signOut()
-        return NextResponse.redirect(new URL('/auth', request.url))
-    }
+                <div>
+                    <label className="block text-sm font-medium mb-1">About / Bio</label>
+                    <textarea
+                        placeholder="Tell influencers about your brand"
+                        value={bio}
+                        onChange={(e) => setBio(e.target.value)}
+                        className="w-full border p-2 rounded"
+                        rows={4}
+                    />
+                </div>
 
-    const role = profile.role
+                <div>
+                    <label className="block text-sm font-medium mb-1">WhatsApp number</label>
+                    <input
+                        placeholder="+92 3xx xxxxxxx"
+                        value={whatsapp}
+                        onChange={(e) => setWhatsapp(e.target.value)}
+                        className="w-full border p-2 rounded"
+                    />
+                </div>
 
-    if (path === '/') {
-        switch (role) {
-            case 'influencer':
-                return NextResponse.redirect(new URL('/dashboard/influencer/profile', request.url))
-            case 'brand':
-                return NextResponse.redirect(new URL('/dashboard/brand/campaigns', request.url))
-            case 'admin':
-                return NextResponse.redirect(new URL('/admin', request.url))
-            default:
-                await supabase.auth.signOut()
-                return NextResponse.redirect(new URL('/auth', request.url))
-        }
-    }
-
-    if (role === 'admin' && !path.startsWith('/admin')) {
-        return NextResponse.redirect(new URL('/admin', request.url))
-    } else if (role === 'brand' && !path.startsWith('/dashboard/brand') && !isPublicPath) {
-        return NextResponse.redirect(new URL('/dashboard/brand/campaigns', request.url))
-    } else if (role === 'influencer' && !path.startsWith('/dashboard/influencer') && !isPublicPath) {
-        return NextResponse.redirect(new URL('/dashboard/influencer/profile', request.url))
-    }
-
-    return response
-}
-
-export const config = {
-    matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
+                <button
+                    type="submit"
+                    className="bg-black text-white px-6 py-2 rounded hover:bg-gray-800 transition"
+                >
+                    Save changes
+                </button>
+            </form>
+        </div>
+    )
 }
