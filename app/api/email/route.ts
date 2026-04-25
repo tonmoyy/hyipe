@@ -1,9 +1,35 @@
+// app/api/email/route.ts
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase'
 
 export async function POST(req: Request) {
-    const { campaignId, brandId, influencerName } = await req.json()
-    // Use a mail service like Resend or Nodemailer; for demo, log
-    console.log(`Notify brand ${brandId}: ${influencerName} applied to campaign ${campaignId}`)
-    return NextResponse.json({ success: true })
+    try {
+        const { campaignId, brandId, influencerName } = await req.json()
+
+        const supabaseAdmin = getSupabaseAdmin()
+
+        const { data: campaign } = await supabaseAdmin
+            .from('campaigns')
+            .select('title')
+            .eq('id', campaignId)
+            .single()
+
+        const { data: brandProfile } = await supabaseAdmin
+            .from('profiles')
+            .select('email')
+            .eq('id', brandId)
+            .single()
+
+        console.log('📧 Notification:')
+        console.log(`   To: ${brandProfile?.email || brandId}`)
+        console.log(`   Subject: New application for "${campaign?.title || 'Untitled'}"`)
+        console.log(`   Body: ${influencerName || 'Someone'} has applied to your campaign.`)
+
+        return NextResponse.json({ success: true })
+    } catch (error: unknown) {
+        const message =
+            error instanceof Error ? error.message : 'Unknown error occurred'
+        console.error('Email notification error:', message)
+        return NextResponse.json({ error: message }, { status: 500 })
+    }
 }
