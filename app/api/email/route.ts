@@ -1,11 +1,12 @@
 // app/api/email/route.ts
 import { NextResponse } from 'next/server'
-import { getSupabaseAdmin } from '@/lib/supabase'
 
 export async function POST(req: Request) {
     try {
         const { campaignId, brandId, influencerName } = await req.json()
 
+        // Dynamically import the admin client – this runs only at request time
+        const { getSupabaseAdmin } = await import('@/lib/supabase')
         const supabaseAdmin = getSupabaseAdmin()
 
         const { data: campaign } = await supabaseAdmin
@@ -27,8 +28,7 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ success: true })
     } catch (error: unknown) {
-        const message =
-            error instanceof Error ? error.message : 'Unknown error occurred'
+        const message = error instanceof Error ? error.message : 'Unknown error'
         console.error('Email notification error:', message)
         return NextResponse.json({ error: message }, { status: 500 })
     }
