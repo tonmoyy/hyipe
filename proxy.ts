@@ -70,14 +70,6 @@ export async function proxy(request: NextRequest) {
 
     const role = profile.role
 
-    if (path === '/') {
-        switch (role) {
-            case 'influencer': return NextResponse.redirect(new URL('/dashboard/influencer/profile', request.url))
-            case 'brand': return NextResponse.redirect(new URL('/dashboard/brand/campaigns', request.url))
-            case 'admin': return NextResponse.redirect(new URL('/admin', request.url))
-            default: await supabase.auth.signOut(); return NextResponse.redirect(new URL('/auth', request.url))
-        }
-    }
 
     if (role === 'admin' && !path.startsWith('/admin')) return NextResponse.redirect(new URL('/admin', request.url))
     if (role === 'brand' && !path.startsWith('/dashboard/brand') && !isPublicPath) return NextResponse.redirect(new URL('/dashboard/brand/campaigns', request.url))
