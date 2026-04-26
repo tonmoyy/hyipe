@@ -184,10 +184,11 @@ export default function Header() {
             </Link>
 
             <nav className="flex items-center gap-4 text-sm">
-                <Link href="/marketplace">Marketplace</Link>
-
                 {user ? (
                     <>
+                        {/* ✅ Marketplace now only visible when logged in */}
+                        <Link href="/marketplace">Marketplace</Link>
+
                         <span className="text-gray-600">{profile?.full_name || user.email}</span>
                         <Link href={`/dashboard/${profile?.role}/profile`}>Dashboard</Link>
 

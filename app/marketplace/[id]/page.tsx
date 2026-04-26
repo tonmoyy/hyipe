@@ -1,5 +1,5 @@
-// app/marketplace/[id]/page.tsx
 'use client'
+
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
@@ -17,13 +17,24 @@ type Campaign = {
 
 export default function CampaignDetail() {
     const { id } = useParams()
-    const { profile } = useAuth()
+    const { profile, user, signOut } = useAuth()
     const router = useRouter()
+
     const [campaign, setCampaign] = useState<Campaign | null>(null)
     const [showApply, setShowApply] = useState(false)
     const [alreadyApplied, setAlreadyApplied] = useState(false)
 
+    // ⚠️ Guard – send to login if not authenticated
     useEffect(() => {
+        if (user === null) {
+            router.push('/auth')
+        }
+    }, [user, router])
+
+    // Fetch campaign + check existing application
+    useEffect(() => {
+        if (!user) return
+
         supabase
             .from('campaigns')
             .select('*')
@@ -38,42 +49,33 @@ export default function CampaignDetail() {
                 .eq('campaign_id', id)
                 .eq('influencer_id', profile.id)
                 .maybeSingle()
-                .then(({ data }) => {
-                    setAlreadyApplied(!!data)
-                })
+                .then(({ data }) => setAlreadyApplied(!!data))
         }
-    }, [id, profile])
+    }, [id, profile, user])
 
-    const handleLogout = async () => {
-        await supabase.auth.signOut()
-        router.push('/')
-    }
+    // Don't render anything until auth loaded
+    if (!user) return null
 
     if (!campaign) return <div className="p-6">Loading...</div>
 
     return (
         <div className="max-w-5xl mx-auto p-6">
-            {/* 🔝 Top bar with navigation and logout */}
+            {/* Top bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-gray-200">
                 <h1 className="text-2xl font-bold">Campaign Details</h1>
                 <div className="flex items-center gap-3">
-                    {profile?.role === 'influencer' && (
-                        <Link
-                            href="/dashboard/influencer/projects"
-                            className="px-4 py-2 text-sm font-medium bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-all"
-                        >
-                            My Projects
-                        </Link>
-                    )}
                     <Link
                         href="/"
-                        className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+                        className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
                     >
                         Home
                     </Link>
                     <button
-                        onClick={handleLogout}
-                        className="px-4 py-2 text-sm font-medium bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all"
+                        onClick={() => {
+                            signOut()
+                            router.push('/')
+                        }}
+                        className="px-4 py-2 text-sm font-medium bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition"
                     >
                         Sign Out
                     </button>
@@ -88,7 +90,6 @@ export default function CampaignDetail() {
                     Budget: <span className="text-green-700">{campaign.budget}</span>
                 </p>
 
-                {/* Apply or already applied */}
                 {profile?.role === 'influencer' && (
                     <div className="mt-6">
                         {alreadyApplied ? (
@@ -98,7 +99,7 @@ export default function CampaignDetail() {
                         ) : (
                             <button
                                 onClick={() => setShowApply(true)}
-                                className="bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-all"
+                                className="bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition"
                             >
                                 Apply Now
                             </button>
@@ -106,7 +107,6 @@ export default function CampaignDetail() {
                     </div>
                 )}
 
-                {/* Back to marketplace link */}
                 <div className="mt-6 pt-4 border-t border-gray-100">
                     <Link
                         href="/marketplace"
