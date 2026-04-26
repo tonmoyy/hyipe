@@ -1,70 +1,93 @@
 'use client'
+
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/providers/AuthProvider'
 import ChatView from '@/components/inbox/ChatView'
 
-type MessageRow = {
-    sender_id: string
-    receiver_id: string
+type Profile = {
+    id: string
+    full_name: string | null
 }
 
-export default function BrandInbox() {
+export default function InfluencerInbox() {
     const { user } = useAuth()
     const [partners, setPartners] = useState<string[]>([])
-    const [selected, setSelected] = useState<string | null>(null)
+    const [partnerNames, setPartnerNames] = useState<Record<string, string>>({})
+    const searchParams = useSearchParams()
+    const [selectedPartner, setSelectedPartner] = useState<string | null>(
+        searchParams.get('partner')
+    )
 
     useEffect(() => {
         if (!user) return
 
-        supabase
-            .from('messages')
-            .select('sender_id, receiver_id')
-            .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-            .then(({ data }: { data: MessageRow[] | null }) => {
+        const loadPartners = async () => {
+            const { data } = await supabase
+                .from('messages')
+                .select('sender_id, receiver_id')
+                .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
 
-                const ids = new Set<string>()
-
-                data?.forEach(m => {
-                    if (m.sender_id !== user.id) ids.add(m.sender_id)
-                    if (m.receiver_id !== user.id) ids.add(m.receiver_id)
-                })
-
-                setPartners(Array.from(ids))
+            const ids = new Set<string>()
+            data?.forEach((m) => {
+                if (m.sender_id !== user.id) ids.add(m.sender_id)
+                if (m.receiver_id !== user.id) ids.add(m.receiver_id)
             })
+
+            const partnerList = Array.from(ids)
+            setPartners(partnerList)
+
+            // Fetch names for all partners
+            if (partnerList.length > 0) {
+                const { data: profiles } = await supabase
+                    .from('profiles')
+                    .select('id, full_name')
+                    .in('id', partnerList)
+
+                const nameMap: Record<string, string> = {}
+                ;(profiles as Profile[])?.forEach((p) => {
+                    nameMap[p.id] = p.full_name || 'Unknown'
+                })
+                setPartnerNames(nameMap)
+            }
+        }
+
+        loadPartners()
     }, [user])
 
+    if (selectedPartner) {
+        return (
+            <div className="p-6">
+                <button
+                    onClick={() => setSelectedPartner(null)}
+                    className="mb-4 text-blue-600 hover:underline"
+                >
+                    ← Back to conversations
+                </button>
+                <ChatView partnerId={selectedPartner} />
+            </div>
+        )
+    }
+
     return (
-        <div>
+        <div className="p-6">
             <h1 className="text-2xl font-bold mb-4">Inbox</h1>
-
-            {selected ? (
-                <div>
-                    <button
-                        onClick={() => setSelected(null)}
-                        className="mb-2 text-blue-600"
-                    >
-                        ← Back
-                    </button>
-
-                    <ChatView partnerId={selected} />
-                </div>
+            {partners.length === 0 ? (
+                <p className="text-gray-500">No conversations yet.</p>
             ) : (
-                <div>
-                    {partners.length === 0 && (
-                        <p className="text-gray-500">No conversations yet.</p>
-                    )}
-
-                    {partners.map(id => (
-                        <button
-                            key={id}
-                            onClick={() => setSelected(id)}
-                            className="block w-full text-left border p-2 mb-2 rounded hover:bg-gray-50"
-                        >
-                            {id}
-                        </button>
+                <ul className="space-y-2">
+                    {partners.map((id) => (
+                        <li key={id}>
+                            <button
+                                onClick={() => setSelectedPartner(id)}
+                                className="w-full text-left border p-3 rounded hover:bg-gray-50"
+                            >
+                                {partnerNames[id] || 'Unknown'}
+                            </button>
+                        </li>
                     ))}
-                </div>
+                </ul>
             )}
         </div>
     )

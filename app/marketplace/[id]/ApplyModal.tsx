@@ -36,11 +36,28 @@ export default function ApplyModal({
             status: 'pending',
         })
 
+        // if (error) {
+        //     toast.error(error.message)
+        //     return
+        // }
+        //
+        // setSubmitted(true)
+        //
+        // // Briefly show the thank-you message, then close
+        // setTimeout(() => {
+        //     onSuccess()
+        //     onClose()
+        // }, 2000)
         if (error) {
-            toast.error(error.message)
+            // This will show detailed info in the browser console
+            console.error('Insert error details:', error)
+            // Also show a more helpful toast message
+            toast.error(`Failed: ${error.message} (code: ${error.code})`)
             return
         }
 
+        // If we get here, the insert succeeded
+        console.log('Application inserted successfully')
         setSubmitted(true)
 
         // Briefly show the thank-you message, then close

@@ -1,35 +1,63 @@
+// app/dashboard/influencer/projects/page.tsx
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/providers/AuthProvider'
 import Link from 'next/link'
 
-// 👇 Fix: campaigns is an array from Supabase
-type App = {
+type Application = {
     id: string
     campaign_id: string
     status: string
-    campaigns: { title: string }[]   // array, not object
+}
+
+type Campaign = {
+    id: string
+    title: string
+    created_by: string
 }
 
 export default function InfluencerProjects() {
     const { user } = useAuth()
-    const [apps, setApps] = useState<App[]>([])
+    const [apps, setApps] = useState<Application[]>([])
+    const [campaigns, setCampaigns] = useState<Record<string, Campaign>>({})
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         if (!user) return
 
-        supabase
-            .from('applications')
-            .select('id, campaign_id, status, campaigns(title)')
-            .eq('influencer_id', user.id)
-            .order('created_at', { ascending: false })
-            .then(({ data }) => {
-                // data is already an array of objects matching our App type
-                setApps((data as App[]) || [])
-                setLoading(false)
-            })
+        const load = async () => {
+            // 1️⃣ Fetch all my applications
+            const { data: applications } = await supabase
+                .from('applications')
+                .select('id, campaign_id, status')
+                .eq('influencer_id', user.id)
+                .order('created_at', { ascending: false })
+
+            const apps = (applications as Application[]) || []
+
+            // 2️⃣ Collect unique campaign IDs
+            const campaignIds = [...new Set(apps.map((a) => a.campaign_id))]
+
+            // 3️⃣ Fetch campaigns separately (no join headaches)
+            if (campaignIds.length > 0) {
+                const { data: campaignsData } = await supabase
+                    .from('campaigns')
+                    .select('id, title, created_by')
+                    .in('id', campaignIds)
+
+                const map: Record<string, Campaign> = {}
+                ;(campaignsData as Campaign[])?.forEach((c) => {
+                    map[c.id] = c
+                })
+                setCampaigns(map)
+            }
+
+            setApps(apps)
+            setLoading(false)
+        }
+
+        load()
     }, [user])
 
     if (loading) return <div className="p-6">Loading...</div>
@@ -52,26 +80,38 @@ export default function InfluencerProjects() {
                 </div>
             ) : (
                 <div className="space-y-3">
-                    {apps.map((app) => (
-                        <div
-                            key={app.id}
-                            className="border p-4 rounded flex justify-between items-center bg-white shadow-sm"
-                        >
-                            <div>
-                                {/* ✅ Access first element of the array */}
-                                <p className="font-medium">
-                                    {app.campaigns?.[0]?.title || 'Untitled'}
-                                </p>
-                                <p className="text-sm capitalize text-gray-500">{app.status}</p>
-                            </div>
-                            <Link
-                                href={`/marketplace/${app.campaign_id}`}
-                                className="text-blue-600 text-sm hover:underline"
+                    {apps.map((app) => {
+                        const campaign = campaigns[app.campaign_id]
+                        return (
+                            <div
+                                key={app.id}
+                                className="border p-4 rounded flex justify-between items-center bg-white shadow-sm"
                             >
-                                View
-                            </Link>
-                        </div>
-                    ))}
+                                <div>
+                                    <p className="font-medium">
+                                        {campaign?.title || 'Untitled Campaign'}
+                                    </p>
+                                    <p className="text-sm capitalize text-gray-500">{app.status}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Link
+                                        href={`/marketplace/${app.campaign_id}`}
+                                        className="text-blue-600 text-sm hover:underline"
+                                    >
+                                        View
+                                    </Link>
+                                    {campaign?.created_by && (
+                                        <Link
+                                            href={`/dashboard/influencer/inbox?partner=${campaign.created_by}`}
+                                            className="text-green-600 text-sm hover:underline"
+                                        >
+                                            Message Brand
+                                        </Link>
+                                    )}
+                                </div>
+                            </div>
+                        )
+                    })}
                 </div>
             )}
         </div>
