@@ -6,16 +6,13 @@ import { useAuth } from '@/providers/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { RealtimeChannel } from '@supabase/supabase-js'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { X } from 'lucide-react'
-import { ChatsCircle } from '@phosphor-icons/react'
+import { Envelope, EnvelopeOpen } from '@phosphor-icons/react'
 
 type Message = {
     id: string
@@ -28,8 +25,8 @@ type Message = {
 export default function Header() {
     const { user, profile, signOut } = useAuth()
 
-    const [unreadCount, setUnreadCount] = useState(0)      // distinct senders count
-    const [messages, setMessages] = useState<Message[]>([]) // latest unread per sender
+    const [unreadCount, setUnreadCount] = useState(0)
+    const [messages, setMessages] = useState<Message[]>([])
     const [open, setOpen] = useState(false)
 
     const channelRef = useRef<RealtimeChannel | null>(null)
@@ -39,7 +36,6 @@ export default function Header() {
     const fetchNotifications = useCallback(async () => {
         if (!user) return
 
-        // Fetch all unread messages for this user
         const { data: unreadMessages, error } = await supabase
             .from('messages')
             .select('id, content, created_at, read, sender_id')
@@ -62,13 +58,12 @@ export default function Header() {
             }
         })
 
-        // Convert map values to array, sort by created_at descending, take top 5
         const latestMessages = Array.from(latestPerSenderMap.values())
             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
             .slice(0, 5)
 
         setMessages(latestMessages)
-        setUnreadCount(latestPerSenderMap.size) // distinct senders count
+        setUnreadCount(latestPerSenderMap.size)
     }, [user])
 
     useEffect(() => {
@@ -151,140 +146,137 @@ export default function Header() {
                 : null
 
     return (
-        <header className="flex justify-between items-center px-6 py-3 border-b bg-white">
-            <Link href="/" className="font-bold text-xl">
-                HYIPE
-            </Link>
+        <header className="w-full border-b bg-white sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
 
-            <nav className="flex items-center gap-4 text-sm">
-                {user ? (
-                    <>
-                        <Link href="/marketplace">Marketplace</Link>
+                {/* Logo */}
+                <Link href="/" className="text-xl font-bold tracking-tight">
+                    HYIPE
+                </Link>
 
-                        <span className="text-gray-600">
-              {profile?.full_name || user.email}
-            </span>
-
-                        <Link href={`/dashboard/${profile?.role}/profile`}>
-                            Dashboard
-                        </Link>
-
-                        {/* Inbox Popover – no text below icon, badge centered above */}
-                        {inboxPath && (
-                            <Popover
-                                open={open}
-                                onOpenChange={(newOpen) => {
-                                    setOpen(newOpen)
-                                    if (newOpen) {
-                                        setTimeout(() => fetchNotificationsRef.current(), 0)
-                                    }
-                                }}
+                {/* Right side */}
+                <div className="flex items-center gap-5">
+                    {user ? (
+                        <>
+                            <Link
+                                href="/marketplace"
+                                className="text-sm text-gray-600 hover:text-black hover-lift"
                             >
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="relative h-auto w-auto p-1"
-                                    >
-                                        <div className="relative">
-                                            <ChatsCircle
-                                                className="w-7 h-7 text-gray-700 hover:text-blue-600 transition-colors"
-                                                weight="regular"
-                                            />
+                                Marketplace
+                            </Link>
+
+                            <Link
+                                href={`/dashboard/${profile?.role}/profile`}
+                                className="text-sm text-gray-600 hover:text-black hover-lift"
+                            >
+                                Dashboard
+                            </Link>
+
+                            <span className="text-sm text-gray-700 font-medium">
+                                {profile?.full_name || user.email}
+                            </span>
+
+                            {/* Notification envelope */}
+                            {inboxPath && (
+                                <Popover open={open} onOpenChange={setOpen}>
+                                    <PopoverTrigger asChild>
+                                        <button className="relative h-9 w-9 flex items-center justify-center rounded-full hover:bg-gray-100 transition hover-lift">
+
+                                            {/* Closed / Open envelope */}
+                                            {open ? (
+                                                <EnvelopeOpen className="w-5 h-5 text-blue-600" />
+                                            ) : (
+                                                <Envelope className="w-5 h-5 text-gray-700" />
+                                            )}
+
+                                            {/* Badge – soft pulse */}
                                             {unreadCount > 0 && (
-                                                <Badge
-                                                    className="absolute -top-2 left-1/2 -translate-x-1/2 h-4 min-w-[16px] px-1 text-[9px] font-bold rounded-full flex items-center justify-center bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-100"
-                                                >
+                                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] px-1.5 rounded-full leading-none animate-pulse-soft">
                                                     {unreadCount > 9 ? '9+' : unreadCount}
-                                                </Badge>
+                                                </span>
+                                            )}
+                                        </button>
+                                    </PopoverTrigger>
+
+                                    <PopoverContent
+                                        align="end"
+                                        className="w-80 p-0 rounded-lg border shadow-soft glass animate-pop"
+                                    >
+                                        {/* Header */}
+                                        <div className="flex items-center justify-between px-4 py-3 border-b">
+                                            <span className="text-sm font-semibold">
+                                                Notifications
+                                            </span>
+                                            <button
+                                                onClick={() => setOpen(false)}
+                                                className="p-1 rounded hover:bg-gray-100"
+                                            >
+                                                <X className="w-4 h-4 text-gray-500" />
+                                            </button>
+                                        </div>
+
+                                        {/* Message list */}
+                                        <div className="max-h-64 overflow-y-auto">
+                                            {messages.length === 0 ? (
+                                                <p className="py-6 text-center text-sm text-gray-500">
+                                                    No new messages
+                                                </p>
+                                            ) : (
+                                                messages.map((m) => (
+                                                    <Link
+                                                        key={m.sender_id}
+                                                        href={`${inboxPath}?partner=${m.sender_id}`}
+                                                        onClick={() => setOpen(false)}
+                                                        className={`block px-4 py-3 border-b text-sm hover:bg-gray-50 ${
+                                                            !m.read ? 'bg-blue-50' : ''
+                                                        }`}
+                                                    >
+                                                        <div className="flex justify-between items-start gap-2">
+                                                            <span className="line-clamp-1">
+                                                                {m.content}
+                                                            </span>
+                                                            {!m.read && (
+                                                                <span className="w-2 h-2 bg-blue-500 rounded-full mt-1" />
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-gray-400 mt-1">
+                                                            {new Date(m.created_at).toLocaleTimeString([], {
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                            })}
+                                                        </div>
+                                                    </Link>
+                                                ))
                                             )}
                                         </div>
-                                    </Button>
-                                </PopoverTrigger>
 
-                                <PopoverContent
-                                    className="w-80 p-0"
-                                    align="end"
-                                    sideOffset={8}
-                                >
-                                    {/* Header */}
-                                    <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50 rounded-t-lg">
-                    <span className="font-semibold text-gray-700">
-                      Notifications
-                    </span>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-7 w-7 text-gray-400 hover:text-gray-600 ml-2"
+                                        {/* Footer */}
+                                        <Link
+                                            href={inboxPath}
                                             onClick={() => setOpen(false)}
+                                            className="block text-center text-sm text-blue-600 py-2 hover:bg-gray-50"
                                         >
-                                            <X className="w-4 h-4" />
-                                        </Button>
-                                    </div>
+                                            View all messages
+                                        </Link>
+                                    </PopoverContent>
+                                </Popover>
+                            )}
 
-                                    {/* Message list – each sender shows only latest unread */}
-                                    <ScrollArea className="h-72">
-                                        {messages.length === 0 ? (
-                                            <p className="px-4 py-6 text-sm text-gray-500 text-center">
-                                                No recent messages
-                                            </p>
-                                        ) : (
-                                            messages.map((m) => (
-                                                <Link
-                                                    key={m.sender_id}   // use sender_id as key so React re-uses correctly
-                                                    href={`${inboxPath}?partner=${m.sender_id}`}
-                                                    onClick={() => setOpen(false)}
-                                                    className={`block px-4 py-3 border-b border-gray-50 transition-colors hover:bg-gray-100 ${
-                                                        !m.read
-                                                            ? 'bg-blue-100 border-l-4 border-l-blue-600 font-semibold'
-                                                            : ''
-                                                    }`}
-                                                >
-                                                    <div className="flex justify-between items-start">
-                                                        <p className="text-sm line-clamp-2">
-                                                            {m.content}
-                                                        </p>
-                                                        {!m.read && (
-                                                            <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 ml-1 mt-0.5" />
-                                                        )}
-                                                    </div>
-                                                    <span className="text-xs text-gray-400 mt-1 block">
-                            {new Date(m.created_at).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                            })}
-                          </span>
-                                                </Link>
-                                            ))
-                                        )}
-                                    </ScrollArea>
-
-                                    {/* Open Inbox link */}
-                                    <Link
-                                        href={inboxPath}
-                                        onClick={() => setOpen(false)}
-                                        className="block text-center px-4 py-3 text-blue-600 text-sm font-medium hover:bg-gray-50 border-t bg-gray-50/20 transition rounded-b-lg"
-                                    >
-                                        Open Inbox →
-                                    </Link>
-                                </PopoverContent>
-                            </Popover>
-                        )}
-
-                        <Button
-                            variant="link"
-                            onClick={signOut}
-                            className="text-red-600 hover:underline p-0 h-auto"
-                        >
-                            Sign Out
-                        </Button>
-                    </>
-                ) : (
-                    <Link href="/auth" className="text-blue-600">
-                        Login
-                    </Link>
-                )}
-            </nav>
+                            {/* Sign out – matched to Influencer Profile style */}
+                            <button
+                                onClick={signOut}
+                                className="text-sm text-red-500 hover:text-red-600 hover:underline font-medium"
+                            >
+                                Sign Out
+                            </button>
+                        </>
+                    ) : (
+                        <Link href="/auth" className="text-blue-600 text-sm hover-lift">
+                            Login
+                        </Link>
+                    )}
+                </div>
+            </div>
         </header>
     )
 }
