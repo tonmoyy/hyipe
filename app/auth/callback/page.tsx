@@ -1,9 +1,11 @@
+// app/auth/callback/page.tsx
 'use client'
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-export default function AuthCallback() {
+// ------------------ inner client component ------------------
+function CallbackHandler() {
     const router = useRouter()
     const searchParams = useSearchParams()
 
@@ -12,7 +14,6 @@ export default function AuthCallback() {
         if (role) {
             supabase.auth.getUser().then(({ data: { user } }) => {
                 if (user) {
-                    // Update profile role if user exists
                     supabase
                         .from('profiles')
                         .upsert({ id: user.id, role }, { onConflict: 'id' })
@@ -27,4 +28,13 @@ export default function AuthCallback() {
     }, [router, searchParams])
 
     return <p className="p-6 text-center">Completing sign‑in…</p>
+}
+
+// ------------------ page component ------------------
+export default function AuthCallback() {
+    return (
+        <Suspense fallback={<p className="p-6 text-center">Loading…</p>}>
+            <CallbackHandler />
+        </Suspense>
+    )
 }
